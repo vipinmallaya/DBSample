@@ -9,6 +9,8 @@ using Android.Support.Design.Widget;
 using Android.Support.V7.App;
 using Android.Views;
 using Android.Widget;
+using Autofac;
+using Autofac.Core;
 using DBSample.Model;
 using Newtonsoft.Json;
 using SQLite;
@@ -20,10 +22,22 @@ namespace DBSample
     {
         private SQLiteAsyncConnection _sqliteConnection;
         private string jsonData;
+        private IContainer container;
 
+        public MainActivity()
+        {
+            
+        }
+
+       
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
+
+            var builder = new ContainerBuilder();
+            builder.RegisterType<SqliteConnection>().As<ISqliteConnection>().SingleInstance();
+            container = builder.Build();
+
             Xamarin.Essentials.Platform.Init(this, savedInstanceState);
             SetContentView(Resource.Layout.activity_main);
 
@@ -34,6 +48,7 @@ namespace DBSample
             _sqliteConnection.CreateTableAsync<Customer>();
             FloatingActionButton fab = FindViewById<FloatingActionButton>(Resource.Id.fab);
             fab.Click += FabOnClick;
+
 
         }
 
@@ -96,17 +111,12 @@ namespace DBSample
             jsonData = JsonConvert.SerializeObject(customers);
         }
 
-        private SQLiteAsyncConnection InitializeDatabase()
+        private void InitializeDatabase()
         {
-            var path = GetDatabasePath();
-            _sqliteConnection = _sqliteConnection ??  new SQLiteAsyncConnection(path);
-            return _sqliteConnection;
+            _sqliteConnection = container.Resolve<ISqliteConnection>().GetConnection();
         }
 
-        private string GetDatabasePath()
-        {
-            return Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "MyData.db");
-        }
+        
 
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Android.Content.PM.Permission[] grantResults)
         {
@@ -115,4 +125,36 @@ namespace DBSample
             base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
         }
 	}
+
+    public interface ISqliteConnection
+    {
+        SQLiteAsyncConnection GetConnection();
+    }
+
+    public class SqliteConnection : ISqliteConnection
+    {
+        private SQLiteAsyncConnection _sqliteConnection;
+
+        public SqliteConnection()
+        {
+
+        }
+
+        public SQLiteAsyncConnection GetConnection()
+        {
+            if (_sqliteConnection == null)
+            {
+                var path = GetDatabasePath();
+                _sqliteConnection = _sqliteConnection ?? new SQLiteAsyncConnection(path); 
+            }
+            return _sqliteConnection;
+
+        }
+        private string GetDatabasePath()
+        {
+            return Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "MyData.db");
+        }
+
+    }
+
 }
